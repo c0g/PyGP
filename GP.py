@@ -57,7 +57,7 @@ class GaussianProcess():
 
 #Calculates the log-likelihood of the GP for its given hyperparameters... I think
     def loglikelihood(self,theta):
-        K = gramm(self.X,self.X,theta) + np.eye(np.size(self.X))*0.00001
+        K = gramm(self.X,self.X,theta) + np.eye(np.size(self.X))*0.001
         sign,Klogdet = np.linalg.slogdet(K)
         marginal = -0.5 * np.matrix(self.f) * np.linalg.inv(np.matrix(K)) * np.matrix(self.f.T) - 0.5 * Klogdet - (self.f.size/2.) * np.log(2*np.pi)
         return np.array(marginal).flatten()
