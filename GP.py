@@ -65,6 +65,10 @@ class GaussianProcess():
     def nll(self,theta):
         return -self.loglikelihood(theta)
 
+
+
+
+
     
 #    def condition(self,X
 #When x and y are jsintly gaussian, this returns conditional of y given x:

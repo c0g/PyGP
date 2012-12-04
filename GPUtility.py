@@ -9,7 +9,7 @@ def gramm(X_n,X_m,theta):
     m2 = on.T.dot(X_m)
     m3 = X_n.T.dot(X_m)
     im = np.eye(np.shape(X_n)[0])
-    return(theta[0]**2 * np.exp((-0.5*np.abs(m1-m2)**2)/theta[1]**2) +im * theta[2]**2)
+    return(np.pi*(theta[0]**2 * np.exp((-0.5*np.abs(np.sin(np.pi*(m1-m2)))**2)/theta[1]**2) +im * theta[2]**2))
 
 def plot_env(x,mu,cov):
     sigma = np.sqrt(cov)
