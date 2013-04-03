@@ -1,79 +1,93 @@
 import numpy as np
-import scipy as sp
-from GPUtility import *
-import scipy.linalg as LA
 import scipy.optimize as opt
-from matplotlib import pyplot as plt
+from cov.dist.Mahalanobis import MahalanobisDist
+from cov.Matern import Matern5
+from cov.meta.Plus import Plus
+from cov.Noise import Noise
+
 class GaussianProcess():
-    def __init__(self,hyperparameters=None,mean='zero',kernel='SqExp'):
-        self.kernel = kernel
-        self.mean = mean
-        self.hyperparameters = hyperparameters
-        self.sigma = 0 #Assume zero noise obs at first
+    def __init__(self,hyp,cov):
+        self.cov = cov
+        self.hyp = hyp
+        self.Ymu = None
+        self.Ys2 = None
         self.X = None
-        self.y = None
-        self.f = None
-        self.C = None
-        self.A = None
-        self.B = None
+        self.Y = None
+        self.Z = None
+        self.T = None
         self.K = None
         
-# Draw a sample from the GP. If we've trained the GP with training points, it draws from the Normal
-# conditioned on the training points. Covariance matrices are in this order: [[A, B], [B', C]].
-# K is the training kernel, Ks is the gramm of training vs test and Kss is the test covariance
-    def draw(self,x):
-        self.condition(x)
-        return np.random.multivariate_normal(self.mean,self.C)
-
-    def condition(self,x):
-        Kss = gramm(x,x,self.hyperparameters)
+    def predict(self,Z):
+        Kss = self.cov.K(self.hyp,Z,Z)
+        Ks = self.cov.K(self.hyp,self.X,Z)
+        self.Ymu = np.dot(Ks.T,np.linalg.solve(self.K,self.Y))
+        self.pK = Kss - np.dot(Ks.T,np.linalg.solve(self.K,Ks))
+        self.Ys2 = np.diag(self.pK)
+        self.Ys2.shape = (np.shape(self.Ys2)[0],1)
+        self.Z = Z
+        return
+    def draw(self,Z):
         if self.K == None:
-            self.mean = np.zeros(np.size(x))
-            self.C = Kss
+            Ymu = np.zeros(np.shape(Z)[0])
+            K = self.cov.K(self.hyp,Z,Z)
+            DMu = np.random.multivariate_normal(Ymu,K)
         else:
-            Ks = gramm(self.X,x,self.hyperparameters)
-            self.mean = Ks.T.dot(np.linalg.inv(self.K).dot(self.f.T))
-            self.C = Kss - Ks.T.dot(np.linalg.inv(self.K).dot(Ks))
+            self.predict(Z)
+            DMu = np.random.multivariate_normal(self.Ymu.flatten(),self.pK)
+        
+        return(DMu)
+    def infer(self,X,Y):
+        self.K = self.cov.K(self.hyp,X,X)
+        self.Y = Y
+        self.X = X
         return
     
-    def learn(self,X,f,sigma=0):
-        KNew = gramm(X,X,self.hyperparameters)
-        KNew = KNew + sigma*np.eye(np.shape(KNew)[0])
-        if self.K == None:
-            self.K = KNew
-            self.f = f
-            self.X = X
-        else:
-            KSide = gramm(self.X,X,self.hyperparameters)
-            self.f = np.hstack((self.f, f))
-            self.X = np.hstack((self.X, X))
-            self.K = np.vstack((np.hstack((self.K,KSide)),np.hstack((KSide.T,KNew))))
+    def infer_marg(self,X,Y):
         return
 
     def optimise_hyper(self):
-        self.hyperparameters = opt.fmin_cg(self.nll,self.hyperparameters)
-        #self.hyperparameters = opt.brute(self.nll,[(-1,1),(-1,1),(-1,1),(-1,1)])
-        return self.hyperparameters
+        res = opt.fmin(self.nll,self.hyp)
+        self.hyp = res
+        self.infer(X,Y)
+        return
 
-#Calculates the log-likelihood of the GP for its given hyperparameters... I think
-    def loglikelihood(self,theta):
-        K = gramm(self.X,self.X,theta) + np.eye(np.size(self.X))*0.001
-        sign,Klogdet = np.linalg.slogdet(K)
-        marginal = -0.5 * np.matrix(self.f) * np.linalg.inv(np.matrix(K)) * np.matrix(self.f.T) - 0.5 * Klogdet - (self.f.size/2.) * np.log(2*np.pi)
-        return np.array(marginal).flatten()
-
-    def nll(self,theta):
-        return -self.loglikelihood(theta)
+    def nll(self,covhyp):
+        K = self.cov.K(covhyp,self.X,self.X)
+        (_,Klogdet) = np.linalg.slogdet(K)
+        marg = (Klogdet + np.dot(self.Y.T,np.linalg.solve(K ,self.Y)) + np.shape(self.Y)[0] * np.log(2*np.pi))/2
+        return marg.flatten()
 
 
-
-
-
+if __name__=="__main__":
+    from GPUtility import plot_env, plot_env3d
+    x = np.linspace(0,10,num=100)
+    (x1,x2) = np.meshgrid(x,x)
+    x1.shape=(10000,1)
+    x2.shape=(10000,1)
+    X = np.hstack((x1,x2));
+    y1 = np.cumsum(np.random.randn(100,1))
+    y2 = np.cumsum(np.random.randn(100,1))
+    (Y1,Y2) = np.meshgrid(y1,y2)
+    Y1.shape = (10000,1)
+    Y2.shape = (10000,1)
+    Y = Y1*Y2
+    iarray = np.random.permutation(np.arange(X.shape[0]))[:100]
+    XSamp = X[iarray,:]
+    YSamp = Y[iarray]
+    cov = Plus(MahalanobisDist(Matern5()),Noise())
+    hyp = np.random.randn(cov.hyp(2))
+    GP = GaussianProcess(hyp,cov)
     
-#    def condition(self,X
-#When x and y are jsintly gaussian, this returns conditional of y given x:
-#    def condition_gaussian(self):
-#        self.C = B - C * np.linalg.inv(A) * C
-#        self.fstar = mu2 + C * np.linalg.inv(B) * f
-        
-        
+    GP.infer(XSamp, YSamp)
+    GP.optimise_hyper()
+    GP.predict(X)
+    plot_env3d(GP)
+    print("Done")
+    
+    
+    
+    
+    
+    
+    
+
