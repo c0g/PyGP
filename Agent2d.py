@@ -1,19 +1,19 @@
 import numpy as np
-from PolyGaussian import PolyGaussian
+from PolyGaussian2d import PolyGaussian
 
 class Agent:
-    def __init__(self,x0,v0,dt,s20,s2t,vmax,id):
+    def __init__(self,x0,v0,dt,s20,s2t,vmax,myd):
         self.x = x0
         self.v = v0
         self.vmax = vmax
         self.pg = PolyGaussian(dt,s20,s2t)
-        self.id = id
+        self.id = 
         self.done = False
         self.p = None
         self.g = None
         
     def propose(self,X,f,tend,gMax=None):
-        p = self.pg.eval(X, self.x, self.v, tend)
+        p = self.pg.eval(X, Y, self.x, self.v, tend)
         self.p = p
         g = p*f
         if gMax is not None:
@@ -21,7 +21,7 @@ class Agent:
             g[g<0] = 0
         self.g = g
         pivot = self.find_idx(X)
-        left = np.sum(g[:pivot+1])
+        left = np.sum(g[:pivot])
         right = np.sum(g[pivot+1:])
         gain = 0
         self.vprop = self.v

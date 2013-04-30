@@ -1,9 +1,6 @@
 import numpy as np
-import scipy.optimize as opt
-from cov.dist.Mahalanobis import MahalanobisDist
-from cov.Matern import Matern5
-from cov.meta.Plus import Plus
-from cov.Noise import Noise
+from scipy import optimize as opt
+
 
 class GaussianProcess():
     def __init__(self,hyp,cov):
@@ -17,6 +14,16 @@ class GaussianProcess():
         self.T = None
         self.K = None
         
+    def get_Ys2(self,Z):
+        Z = np.array([Z])
+        Z.shape = (1,1)
+        Kss = self.cov.K(self.hyp,Z,Z)
+        Ks = self.cov.K(self.hyp,self.X,Z)
+        pK = Kss - np.dot(Ks.T,np.linalg.solve(self.K,Ks))
+        Ys2 = np.diag(pK)
+        Ys2.shape = (np.shape(Ys2)[0],1)
+        Ymu = np.dot(Ks.T,np.linalg.solve(self.K,self.Y))
+        return  2*np.sqrt(Ys2)
     def predict(self,Z):
         Kss = self.cov.K(self.hyp,Z,Z)
         Ks = self.cov.K(self.hyp,self.X,Z)
@@ -26,6 +33,7 @@ class GaussianProcess():
         self.Ys2.shape = (np.shape(self.Ys2)[0],1)
         self.Z = Z
         return
+
     def draw(self,Z):
         if self.K == None:
             Ymu = np.zeros(np.shape(Z)[0])
@@ -36,25 +44,35 @@ class GaussianProcess():
             DMu = np.random.multivariate_normal(self.Ymu.flatten(),self.pK)
         
         return(DMu)
+    def infer_iter(self,X,Y):
+        Knew = self.cov.K(self.hyp,X,X)
+        Ks = self.cov.K(self.hyp,self.X,X)
+        self.K = np.hstack((np.vstack((self.K,Ks.T)),np.vstack((Ks,Knew))))
+        self.Y = np.vstack((self.Y,Y))
+        self.X = np.vstack((self.X,X))
+        return
     def infer(self,X,Y):
         self.K = self.cov.K(self.hyp,X,X)
         self.Y = Y
         self.X = X
         return
     
-    def infer_marg(self,X,Y):
+    def infer_shit(self,X,Y):
+
         return
 
     def optimise_hyper(self):
-        res = opt.fmin(self.nll,self.hyp)
-        self.hyp = res
-        self.infer(X,Y)
+        hyp = self.hyp.flatten()
+        res = opt.minimize(self.nll,hyp)
+        self.hyp = res.x
+        print(self.hyp)
+        self.infer(self.X,self.Y)
         return
 
     def nll(self,covhyp):
         K = self.cov.K(covhyp,self.X,self.X)
         (_,Klogdet) = np.linalg.slogdet(K)
-        marg = (Klogdet + np.dot(self.Y.T,np.linalg.solve(K ,self.Y)) + np.shape(self.Y)[0] * np.log(2*np.pi))/2
+        marg = (Klogdet + np.dot(self.Y.T,np.linalg.solve(K ,self.Y)) + np.shape(self.Y)[0] * np.log(2*np.pi))/2  + np.dot(np.exp(covhyp).T,np.exp(covhyp))
         return marg.flatten()
 
 
@@ -83,11 +101,3 @@ if __name__=="__main__":
     GP.predict(X)
     plot_env3d(GP)
     print("Done")
-    
-    
-    
-    
-    
-    
-    
-
