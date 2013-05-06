@@ -1,14 +1,13 @@
 import numpy as np
-from scipy.spatial.distance import euclidean 
-from util.ltri import ltri
 from scipy.spatial.distance import cdist
 class EuclideanDist:
     def __init__(self,cov):
         self.cov = cov
         return
-    def K(self,hyp,X,Z):
+    def K(self,hyp,Z1,Z2):
+        #ipdb.set_trace()
         ell = np.exp(2*hyp[0])
-        K = cdist(X, Z, metric='euclidean')/ell
+        K = cdist(Z1, Z2, metric='euclidean')/ell
         K = self.cov.K(hyp[1:],K)
         return K   
     def _hyp(self,D):

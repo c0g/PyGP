@@ -9,7 +9,7 @@ class Noise:
             K = np.eye(np.shape(X)[0],np.shape(X)[0])*s2
         else:
             K = np.zeros((np.shape(X)[0],np.shape(Z)[0]))
-        return K   
+        return K
     def _hyp(self,D):
         return 0
     def hyp(self,D):
