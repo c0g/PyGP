@@ -15,10 +15,10 @@ class Noise:
     def hyp(self,D):
         return self._hyp(D)
     
-    def dK(self,hyp,d):
-        #Vector of differentials w.r.t all hyp
-        return
-    def chain(self,hyp,d):
-        #We're part of a chain rule differentiation, differential w.r.t. d
+    def dK(self,hyp,X,Z):
+        if X is Z:
+            K = np.eye(np.shape(X)[0],np.shape(X)[0])
+        else:
+            K = np.zeros((np.shape(X)[0],np.shape(Z)[0]))
         return
         
