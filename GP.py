@@ -46,46 +46,45 @@ class GaussianProcess():
         return np.random.multivariate_normal(Ymu.flatten(),Ys2)
 
     def optimise_hyper(self):
-        hyp = np.hstack((self.lik,self.hyp))
-        prior = np.eye(len(hyp))/100
+        prior = np.eye(len(self.hyp))/10
         #bounds = [(-1,1)]*3
-        ret=opt.minimize(self.loglik,hyp,jac=self.dloglik,method='L-BFGS-B',args=(self.cov,self.Z,self.Z,self.F,prior))
-        self.lik = np.array([ret.x[0]])
-        self.hyp = ret.x[1:]
+        ret=opt.minimize(self.loglik,self.hyp,jac=self.dloglik,method='CG',args=(self.cov,self.Z,self.Z,self.F,prior))
+        self.hyp = ret.x
         self.K = self.cov.K(self.hyp,self.Z,self.Z)[0]
+        print(ret)
 
     def loglik(self,hyp,cov,Z1,Z2,obs,prior):
-        lik = np.exp(hyp.flatten()[0]*2)
-        likMat = np.eye(np.shape(Z1)[0]) * lik
-        hyp2 = hyp.flatten()[1:]
+        lik = np.exp(self.lik*2)
+        likMat = np.eye(np.shape(Z1)[0]) * 0
+        hyp2 = hyp.flatten()
         K = cov.K(hyp2,Z1,Z2)[0]
-        C = K + likMat + 1e-5
+        C = K + likMat#+ np.eye(np.shape(Z1)[0])
+
         try:
             L = np.linalg.cholesky(C)
             Cnt = np.linalg.solve(L.T,np.linalg.solve(L,obs))
         except np.linalg.LinAlgError:
             Cnt = np.linalg.solve(C,obs)
         (s,CLogDet) = np.linalg.slogdet(C)
-        ll = -0.5 * CLogDet - 0.5 * obs.T.dot(Cnt) - np.size(obs)*np.log(2*np.pi)/2 + np.exp(hyp*2).flatten().T.dot(prior.dot(np.exp(hyp*2).flatten()))
-        return ll
+        ll = - 0.5 * CLogDet - 0.5 * obs.T.dot(Cnt)  - np.size(obs)*np.log(2*np.pi)/2 #+ np.exp(hyp*2).flatten().T.dot(prior.dot(np.exp(hyp*2).flatten()))
+        return -ll
 
     def dloglik(self,hyp,cov,Z1,Z2,obs,prior):
-        lik = np.exp(hyp.flatten()[0]*2)
-        likMat = np.eye(np.shape(Z1)[0]) * lik
-        hyp2 = hyp.flatten()[1:]
+        lik = np.exp(self.lik*2)
+        likMat = np.eye(np.shape(Z1)[0]) * 0
+        hyp2 = hyp.flatten()
         kDk= cov.K(hyp2,Z1,Z2)
         K = kDk[0]
-        C = K + likMat + 1e-5
+        C = K + likMat #+ np.eye(np.shape(Z1)[0])
         try:
             L = np.linalg.cholesky(C)
             Cnt = np.linalg.solve(L.T,np.linalg.solve(L,obs))
         except np.linalg.LinAlgError:
             L=None
             Cnt = np.linalg.solve(C,obs)
-        Cnt = np.linalg.solve(L.T,np.linalg.solve(L,obs))
         dk = kDk[1]
-        dK = (2*likMat,dk[0],dk[1])
-        drivs = [np.array([])]*(len(hyp))
+        dK = (dk[0],dk[1])
+        drivs = [np.array([])]*(len(hyp2))
 
         for i,d in enumerate(dK):
             if L is not None:
@@ -93,25 +92,28 @@ class GaussianProcess():
             else: 
                 CnDCn = np.linalg.solve(C,d)
             drivs[i] = (-np.trace(CnDCn) + obs.T.dot(CnDCn).dot(Cnt))/2
-        return np.array(drivs).flatten() +  4*np.exp(hyp.flatten()*4).T.dot(prior)
+        return -np.array(drivs).flatten() #+  4*np.exp(hyp.flatten()*4).T.dot(prior)
 
 
 if __name__ == "__main__":
     from cov.SquaredExponentialEuc import SqExpEuc
     from cov.Noise import Noise
     from matplotlib import pyplot as plt
-    Z = np.linspace(0,10)
-    Zpred = np.linspace(0,10,100)
-    Zpred.shape = (100,1)
-    Z.shape = (50,1)
-    obs = np.sin(Z) + np.random.randn(50,1)*0.1
+    Z = np.linspace(0,10,10)
+    Zpred = np.linspace(0,10,1000)
+    Zpred.shape = (1000,1)
+    Z.shape = (10,1)
+    obs = np.exp(-(Z-5)**2) + np.random.randn(10,1)*0.1
     cov = SqExpEuc()
-    gp = GaussianProcess(np.array([1]),np.array([1,1]),cov)
+    hyp = np.log(np.array([1,1]))
+    lik = np.log(np.array([0.001]))
+    gp = GaussianProcess(lik,hyp,cov)
     gp.infer(Z,obs)
     gp.predict(Zpred)
-    plt.close()
+    plt.clf()
     plt.subplot('211')
     plt.plot(Zpred,gp.Ymu)
+    plt.plot(Zpred,gp.Ymu +np.sqrt(gp.Ys2))
     plt.plot(Z,obs)
     print(gp.hyp,gp.lik)
     gp.optimise_hyper()
@@ -119,7 +121,9 @@ if __name__ == "__main__":
     print(gp.hyp,gp.lik)
     plt.subplot('212')
     plt.plot(Zpred,gp.Ymu)
+    plt.plot(Zpred,gp.Ymu +np.sqrt(gp.Ys2))
     plt.plot(Z,obs)
+    plt.draw()
     plt.show()
 
 
