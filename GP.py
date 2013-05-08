@@ -49,13 +49,13 @@ class GaussianProcess():
         prior = np.eye(len(self.hyp))/10
         #bounds = [(-1,1)]*3
         ret=opt.minimize(self.loglik,self.hyp,jac=self.dloglik,method='CG',args=(self.cov,self.Z,self.Z,self.F,prior))
-        self.hyp = ret.x
+        self.hyp = ret.x.flatten()
         self.K = self.cov.K(self.hyp,self.Z,self.Z)[0]
         print(ret)
 
     def loglik(self,hyp,cov,Z1,Z2,obs,prior):
         lik = np.exp(self.lik*2)
-        likMat = np.eye(np.shape(Z1)[0]) * 0
+        likMat = np.eye(np.shape(Z1)[0]) * lik
         hyp2 = hyp.flatten()
         K = cov.K(hyp2,Z1,Z2)[0]
         C = K + likMat#+ np.eye(np.shape(Z1)[0])
@@ -71,7 +71,7 @@ class GaussianProcess():
 
     def dloglik(self,hyp,cov,Z1,Z2,obs,prior):
         lik = np.exp(self.lik*2)
-        likMat = np.eye(np.shape(Z1)[0]) * 0
+        likMat = np.eye(np.shape(Z1)[0]) * lik
         hyp2 = hyp.flatten()
         kDk= cov.K(hyp2,Z1,Z2)
         K = kDk[0]
@@ -99,14 +99,14 @@ if __name__ == "__main__":
     from cov.SquaredExponentialEuc import SqExpEuc
     from cov.Noise import Noise
     from matplotlib import pyplot as plt
-    Z = np.linspace(0,10,10)
+    Z = np.linspace(0,10,15)
     Zpred = np.linspace(0,10,1000)
     Zpred.shape = (1000,1)
-    Z.shape = (10,1)
-    obs = np.exp(-(Z-5)**2) + np.random.randn(10,1)*0.1
+    Z.shape = (15,1)
+    obs = np.exp(-(Z-5)**2) #+ np.random.randn(10,1)*1
     cov = SqExpEuc()
-    hyp = np.log(np.array([1,1]))
-    lik = np.log(np.array([0.001]))
+    hyp = np.log(np.array([10,10]))
+    lik = np.log(np.array([0.000001]))
     gp = GaussianProcess(lik,hyp,cov)
     gp.infer(Z,obs)
     gp.predict(Zpred)
@@ -121,7 +121,7 @@ if __name__ == "__main__":
     print(gp.hyp,gp.lik)
     plt.subplot('212')
     plt.plot(Zpred,gp.Ymu)
-    plt.plot(Zpred,gp.Ymu +np.sqrt(gp.Ys2))
+    plt.plot(Zpred,gp.Ymu +2*np.sqrt(gp.Ys2))
     plt.plot(Z,obs)
     plt.draw()
     plt.show()
