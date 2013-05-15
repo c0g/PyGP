@@ -25,7 +25,7 @@ class GaussianProcess():
         self.Zp = Zp
         return
 
-    def infer(self,Z,Fobs):
+    def observe(self,Z,Fobs):
         Knew = self.cov.K(self.hyp,Z,Z)[0]
         if self.K.size != 0:
             Ks = self.cov.K(self.hyp,self.Z,Z)[0]
@@ -51,7 +51,7 @@ class GaussianProcess():
         ret=opt.minimize(self.loglik,self.hyp,jac=self.dloglik,method='CG',args=(self.cov,self.Z,self.Z,self.F,prior))
         self.hyp = ret.x.flatten()
         self.K = self.cov.K(self.hyp,self.Z,self.Z)[0]
-        print(ret)
+        return(ret)
 
     def loglik(self,hyp,cov,Z1,Z2,obs,prior):
         lik = np.exp(self.lik*2)
