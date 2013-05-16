@@ -82,9 +82,9 @@ class GaussianProcess():
         except np.linalg.LinAlgError:
             L=None
             Cnt = np.linalg.solve(C,obs)
-        dk = kDk[1]
-        dK = (dk[0],dk[1])
-        drivs = [np.array([])]*(len(hyp2))
+        dK = kDk[1]
+
+        drivs = [np.array([])]*len(dK)
 
         for i,d in enumerate(dK):
             if L is not None:
